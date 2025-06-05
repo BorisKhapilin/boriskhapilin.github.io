@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+  <ModulePrefs title="Time Between Statuses" height="450" scrolling="true" />
+  <UserPref name="jql" display_name="JQL фильтр" default_value="project = DEMO ORDER BY created DESC" />
+  <UserPref name="fromStatus" display_name="Статус ОТ" default_value="To Do" />
+  <UserPref name="toStatus" display_name="Статус ДО" default_value="In Progress" />
+  <Content type="url" href="http://прав-авто.рф/files/gadgets/status-time-gadget.html" />
+</Module>

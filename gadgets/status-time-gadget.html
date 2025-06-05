@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Время между статусами</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 10px; }
+    canvas { max-width: 100%; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h3>Время между статусами</h3>
+  <div id="params"></div>
+  <canvas id="statusChart"></canvas>
+
+  <script>
+    function getUserPref(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    const jiraUrl = "https://jira.ozplanet.uz";
+    const authHeader = "Basic ZGFzaGJvYXJkOmt5bnBpaC16dWtaYXEtOHBla3Np"; // ⚠️ замените в проде
+    const jql = getUserPref("jql") || "project = OZPLANET ORDER BY created DESC";
+    const fromStatus = getUserPref("fromStatus") || "To Do";
+    const toStatus = getUserPref("toStatus") || "In Progress";
+
+    document.getElementById("params").innerHTML =
+      `<p><strong>JQL:</strong> ${jql}<br><strong>От:</strong> ${fromStatus} → <strong>До:</strong> ${toStatus}</p>`;
+
+    const buckets = [
+      { label: "<1ч", min: 0, max: 1 },
+      { label: "1–4ч", min: 1, max: 4 },
+      { label: "4–8ч", min: 4, max: 8 },
+      { label: "8–24ч", min: 8, max: 24 },
+      { label: "1–3д", min: 24, max: 72 },
+      { label: "3–7д", min: 72, max: 168 },
+      { label: ">7д", min: 168, max: Infinity }
+    ];
+
+    const bucketCounts = new Array(buckets.length).fill(0);
+
+    fetch(`${jiraUrl}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=50&expand=changelog`, {
+      headers: { "Authorization": authHeader }
+    })
+    .then(res => res.json())
+    .then(data => {
+      data.issues.forEach(issue => {
+        let fromTime = null, toTime = null;
+
+        for (let h of issue.changelog.histories) {
+          for (let item of h.items) {
+            if (item.field === "status") {
+              if (item.toString === fromStatus) fromTime = new Date(h.created);
+              if (item.toString === toStatus && fromTime) {
+                toTime = new Date(h.created);
+                break;
+              }
+            }
+          }
+          if (toTime) break;
+        }
+
+        if (fromTime && toTime) {
+          const hours = (toTime - fromTime) / 3600000;
+          for (let i = 0; i < buckets.length; i++) {
+            if (hours >= buckets[i].min && hours < buckets[i].max) {
+              bucketCounts[i]++;
+              break;
+            }
+          }
+        }
+      });
+
+      // Рисуем диаграмму
+      new Chart(document.getElementById("statusChart"), {
+        type: "bar",
+        data: {
+          labels: buckets.map(b => b.label),
+          datasets: [{
+            label: "Количество задач",
+            data: bucketCounts,
+            backgroundColor: "rgba(54, 162, 235, 0.6)"
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: "Задачи по диапазонам времени"
+            },
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    })
+    .catch(err => {
+      document.body.innerHTML = `<p>Ошибка: ${err.message}</p>`;
+    });
+  </script>
+</body>
+</html>
